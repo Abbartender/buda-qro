@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BUDA® — Club · 夜</title>
+<link rel="icon" type="image/png" href="assets/icon-disc-club.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --fg:#fff;
+    --dim:rgba(255,255,255,.5);
+    --sans:'Helvetica Neue',Helvetica,Arial,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+    --pad:clamp(20px,4.5vw,56px);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#000;color:var(--fg);font-family:var(--sans);height:100svh;overflow:hidden;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  ::selection{background:#fff;color:#000}
+
+  .stage{position:fixed;inset:0;overflow:hidden;background:#000}
+
+  /* video = atmospheric backdrop (darkened, desaturated) */
+  video{position:absolute;top:50%;left:50%;min-width:100%;min-height:100%;width:auto;height:auto;
+    transform:translate(-50%,-50%);object-fit:cover;
+    filter:grayscale(.4) contrast(1.08) brightness(.46);z-index:0}
+
+  /* monolith canvas floats above video */
+  #scene{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1}
+
+  .vig{position:absolute;inset:0;z-index:2;pointer-events:none;
+    background:radial-gradient(115% 90% at 50% 46%,transparent 34%,rgba(0,0,0,.72) 100%),
+               linear-gradient(180deg,rgba(0,0,0,.55) 0%,transparent 24%,transparent 60%,rgba(0,0,0,.86) 100%)}
+  .grain{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:.06;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  .ui{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;justify-content:space-between;
+    padding:24px var(--pad) 26px;pointer-events:none}
+  .ui a{pointer-events:auto}
+  .top{display:flex;justify-content:space-between;align-items:flex-start;
+    font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--dim)}
+  .top a{opacity:.85;transition:opacity .3s}
+  .top a:hover{opacity:1}
+  .top .r{text-align:right;line-height:1.7}
+
+  /* kanji line, pinned near top-center */
+  .kanji{position:absolute;top:clamp(76px,13vh,120px);left:0;right:0;z-index:5;text-align:center;pointer-events:none;
+    font-family:var(--mono);font-size:12px;letter-spacing:.5em;color:var(--dim);
+    opacity:0;animation:rise 1.2s cubic-bezier(.2,.7,.2,1) .25s forwards}
+
+  /* brand lockup, anchored bottom-center */
+  .lockup{display:flex;flex-direction:column;align-items:center;gap:clamp(14px,2vh,20px);text-align:center}
+  .disc{width:clamp(54px,7vw,70px);height:clamp(54px,7vw,70px);border-radius:50%;
+    border:1px solid rgba(255,255,255,.24);display:grid;place-items:center;overflow:hidden;
+    box-shadow:0 0 44px rgba(0,0,0,.5);
+    opacity:0;animation:rise 1.2s cubic-bezier(.2,.7,.2,1) .35s forwards}
+  .disc img{width:100%;height:100%;object-fit:cover;display:block}
+  .cw{font-family:var(--sans);font-weight:700;letter-spacing:.04em;line-height:1;
+    font-size:clamp(26px,4.6vw,54px);text-shadow:0 6px 50px rgba(0,0,0,.6);
+    opacity:0;animation:rise 1.3s cubic-bezier(.2,.7,.2,1) .45s forwards}
+  .cw sup{font-size:.26em;vertical-align:super;font-weight:500;letter-spacing:0}
+  .cmeta{display:flex;align-items:center;gap:clamp(12px,2vw,20px);flex-wrap:wrap;justify-content:center;
+    font-family:var(--mono);font-size:12px;letter-spacing:.22em;color:var(--dim);
+    opacity:0;animation:rise 1.3s cubic-bezier(.2,.7,.2,1) .55s forwards}
+  .cmeta .days{color:#fff;letter-spacing:.3em;display:inline-flex;align-items:center;gap:10px}
+  .cmeta .pulse{width:7px;height:7px;border-radius:50%;background:#fff;animation:beat 1.8s ease-in-out infinite}
+  @keyframes beat{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
+  .cmeta .sep{opacity:.35}
+  .cmeta .ig{color:#fff;display:inline-flex;align-items:center;gap:8px}
+  .cmeta .ig:hover{opacity:.7}
+  .cmeta .ig .arr{transition:transform .4s}
+  .cmeta .ig:hover .arr{transform:translate(4px,-4px)}
+
+  @keyframes rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+  .snd{position:absolute;bottom:24px;left:var(--pad);z-index:6;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.26em;color:var(--dim);
+    border:1px solid rgba(255,255,255,.22);padding:9px 16px;border-radius:40px;cursor:pointer;
+    display:flex;align-items:center;gap:9px;background:rgba(0,0,0,.25);backdrop-filter:blur(3px);
+    transition:color .3s,border-color .3s}
+  .snd:hover{color:#fff;border-color:rgba(255,255,255,.5)}
+  .snd .dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.6}
+  @media(max-width:560px){.cmeta{font-size:10px;gap:10px}.cmeta .sep{display:none}}
+
+  @media(prefers-reduced-motion:reduce){
+    .kanji,.cw,.disc,.cmeta{animation:none;opacity:1}
+    .cmeta .pulse{animation:none}
+  }
+</style>
+</head>
+<body>
+<div class="stage" data-screen-label="Club Hero">
+  <video id="v" autoplay muted loop playsinline preload="auto">
+    <source src="assets/club-hero.mp4" type="video/mp4">
+  </video>
+  <canvas id="scene"></canvas>
+  <div class="vig"></div>
+  <div class="grain"></div>
+
+  <div class="kanji">夢 — LOS SUEÑOS DE BUDA</div>
+
+  <div class="ui">
+    <div class="top">
+      <a href="index.html">← BUDA® / RESTAURANTE</a>
+      <div class="r">QUERÉTARO, QRO.<br>夜 — LA NOCHE</div>
+    </div>
+    <div class="lockup">
+      <span class="disc"><img src="assets/icon-disc-club.png" alt="BUDA Club"></span>
+      <div class="cw">BUDA<sup>®</sup> CLUB</div>
+      <div class="cmeta">
+        <span class="days"><span class="pulse"></span>VIERNES — SÁBADO</span>
+        <span class="sep">·</span>
+        <a class="ig" href="https://instagram.com/buda.clubbb" target="_blank" rel="noopener">@buda.clubbb <span class="arr">↗</span></a>
+      </div>
+    </div>
+  </div>
+
+  <button class="snd" id="snd"><span class="dot"></span> SONIDO</button>
+</div>
+
+<script>
+/* video kickstart */
+(function(){
+  var v=document.getElementById('v'),btn=document.getElementById('snd');
+  if(v&&v.play){v.play().catch(function(){});}
+  var on=false;
+  btn.addEventListener('click',function(){
+    on=!on;v.muted=!on;
+    if(on){v.play().catch(function(){});}
+    btn.innerHTML='<span class="dot"></span> '+(on?'SONIDO · ON':'SONIDO');
+    btn.style.color=on?'#fff':'';
+  });
+})();
+
+/* ---------------- 3D monolith ---------------- */
+(function(){
+  if(!window.THREE){window.__mono='no THREE';return;}
+  try{
+  var canvas=document.getElementById('scene');
+  var stage=document.querySelector('.stage');
+  var renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true,alpha:true,preserveDrawingBuffer:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  var scene=new THREE.Scene();
+  var camera=new THREE.PerspectiveCamera(36,1,.1,100);
+  camera.position.set(0,0,7.4);
+
+  function noise(x,y,z){
+    return (Math.sin(x*1.9+y*1.3)*0.5
+          + Math.sin(y*2.3-z*1.7)*0.34
+          + Math.sin(z*1.6+x*2.1)*0.28
+          + Math.sin((x+z)*3.1)*0.16);
+  }
+  var geo=new THREE.IcosahedronGeometry(2.05,3);
+  var pos=geo.attributes.position, v3=new THREE.Vector3();
+  for(var k=0;k<pos.count;k++){
+    v3.set(pos.getX(k),pos.getY(k),pos.getZ(k));
+    var len=v3.length(), d=noise(v3.x*1.05,v3.y*1.05,v3.z*1.05);
+    v3.multiplyScalar((len+d*0.46)/len);
+    pos.setXYZ(k,v3.x,v3.y,v3.z);
+  }
+  geo.computeVertexNormals();
+
+  var mat=new THREE.MeshStandardMaterial({color:0x141414,roughness:.78,metalness:.34,flatShading:true});
+  var stone=new THREE.Mesh(geo,mat);
+  var edges=new THREE.LineSegments(
+    new THREE.EdgesGeometry(geo,18),
+    new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:.14})
+  );
+  var group=new THREE.Group();
+  group.add(stone);group.add(edges);
+  group.rotation.x=-.12;
+  scene.add(group);
+
+  /* single hard key light = the moon; cool rim from the club */
+  var key=new THREE.DirectionalLight(0xffffff,3.6);key.position.set(-5,6,5);scene.add(key);
+  var rim=new THREE.DirectionalLight(0xbfd0ff,2.2);rim.position.set(6,-1,-4);scene.add(rim);
+  var fill=new THREE.DirectionalLight(0xffffff,.35);fill.position.set(3,-4,4);scene.add(fill);
+  scene.add(new THREE.AmbientLight(0x0c0c0c,1));
+
+  function resize(){
+    var w=stage.clientWidth,h=stage.clientHeight;
+    renderer.setSize(w,h,false);
+    camera.aspect=w/h;
+    camera.position.z=w<640?9.4:(w<1000?8.3:7.4);
+    camera.updateProjectionMatrix();
+    renderer.render(scene,camera);
+  }
+  window.addEventListener('resize',resize);resize();
+
+  var mx=0,my=0,tmx=0,tmy=0;
+  window.addEventListener('pointermove',function(e){
+    tmx=(e.clientX/window.innerWidth-.5);
+    tmy=(e.clientY/window.innerHeight-.5);
+  },{passive:true});
+
+  var reduce=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  var t0=performance.now();
+  function loop(now){
+    requestAnimationFrame(loop);
+    var t=(now-t0)/1000;
+    mx+=(tmx-mx)*.05;my+=(tmy-my)*.05;
+    if(!reduce){
+      group.rotation.y=t*0.17+mx*0.6;
+      group.rotation.x=-.12+Math.sin(t*0.42)*0.07+my*0.4;
+      group.position.y=Math.sin(t*0.6)*0.08;
+    }else{
+      group.rotation.y=mx*0.4; group.rotation.x=-.12+my*0.3;
+    }
+    renderer.render(scene,camera);
+  }
+  requestAnimationFrame(loop);
+  renderer.render(scene,camera);
+  window.__mono='ok';
+  }catch(err){window.__mono='ERR: '+(err&&err.message);console.error('monolith',err);}
+})();
+</script>
+
+<template id="__bundler_thumbnail" data-bg-color="#000000">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#000000"></rect>
+    <g transform="translate(600,400)">
+      <ellipse cx="0" cy="-78" rx="74" ry="27" fill="#ffffff"></ellipse>
+      <ellipse cx="0" cy="2" rx="100" ry="34" fill="#ffffff"></ellipse>
+      <ellipse cx="0" cy="86" rx="128" ry="43" fill="#ffffff"></ellipse>
+    </g>
+  </svg>
+</template>
+</body>
+</html>
